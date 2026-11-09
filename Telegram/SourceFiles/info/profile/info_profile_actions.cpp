@@ -13,6 +13,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_report.h"
 #include "api/api_statistics.h"
 #include "apiwrap.h"
+#include "blacklist/blacklist_manager.h"
 #include "base/call_delayed.h"
 #include "base/event_filter.h"
 #include "base/options.h"
@@ -1307,6 +1308,7 @@ private:
 	void addFastButtonsMode(not_null<UserData*> user);
 	void addReportAction();
 	void addBlockAction(not_null<UserData*> user);
+	void addBlacklistAction(not_null<UserData*> user);
 	void addLeaveChannelAction(not_null<ChannelData*> channel);
 	void addJoinChannelAction(not_null<ChannelData*> channel);
 	void fillUserActions(not_null<UserData*> user);
@@ -3170,6 +3172,41 @@ void ActionsFiller::addBlockAction(not_null<UserData*> user) {
 		st::infoBlockButton);
 }
 
+void ActionsFiller::addBlacklistAction(not_null<UserData*> user) {
+	const auto manager = &Blacklist::Manager::Instance();
+	const auto userId = peerToUser(user->id);
+	const auto inList = _wrap->lifetime().make_state<rpl::variable<bool>>(
+		Blacklist::IsHidden(userId));
+	manager->changes(
+	) | rpl::on_next([=] {
+		*inList = Blacklist::IsHidden(userId);
+	}, _wrap->lifetime());
+
+	auto text = inList->value() | rpl::map([](bool hidden) {
+		return hidden
+			? Blacklist::Tr(
+				"Remove from blacklist",
+				"Убрать из чёрного списка")
+			: Blacklist::Tr(
+				"Add to blacklist",
+				"Внести в чёрный список");
+	});
+	auto callback = [=] {
+		if (Blacklist::IsHidden(userId)) {
+			manager->remove(userId);
+		} else {
+			manager->add(userId, user->username(), user->name());
+		}
+	};
+	AddActionButton(
+		_wrap,
+		std::move(text),
+		rpl::single(true),
+		std::move(callback),
+		&st::infoIconBlock,
+		st::infoBlockButton);
+}
+
 void ActionsFiller::addLeaveChannelAction(not_null<ChannelData*> channel) {
 	Expects(_controller->parentController());
 
@@ -3225,6 +3262,7 @@ void ActionsFiller::fillUserActions(not_null<UserData*> user) {
 	}
 	if (!user->isSelf() && !user->isSupport() && !user->isVerifyCodes()) {
 		addBlockAction(user);
+		addBlacklistAction(user);
 	}
 }
 

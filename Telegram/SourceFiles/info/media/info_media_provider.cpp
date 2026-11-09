@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/media/info_media_provider.h"
 
 #include "apiwrap.h"
+#include "blacklist/blacklist_manager.h"
 #include "info/media/info_media_widget.h"
 #include "info/media/info_media_list_section.h"
 #include "info/info_controller.h"
@@ -71,6 +72,11 @@ Provider::Provider(not_null<AbstractController*> controller)
 				layout.item->maybeClearSensitiveSpoiler();
 			}
 		}
+	}, _lifetime);
+
+	Blacklist::Manager::Instance().changes(
+	) | rpl::on_next([=] {
+		restart();
 	}, _lifetime);
 }
 
@@ -492,7 +498,7 @@ std::unique_ptr<BaseLayout> Provider::createLayout(
 		Type type) {
 	const auto item = _controller->session().data().message(
 		computeFullId(universalId));
-	if (!item) {
+	if (!item || Blacklist::IsHidden(item)) {
 		return nullptr;
 	}
 	return CreateLayout(delegate, item, type);

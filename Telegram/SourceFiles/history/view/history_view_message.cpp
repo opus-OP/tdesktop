@@ -1398,6 +1398,11 @@ QRect Message::effectIconGeometry() const {
 QSize Message::performCountOptimalSize() {
 	const auto item = data();
 
+	const auto itemMedia = item->media();
+	_hideReply = (delegate()->elementHideReply(this)
+		|| item->Get<HistoryMessageSuggestion>()
+		|| (itemMedia && itemMedia->giveawayResults())) ? 1 : 0;
+
 	const auto replyData = item->Get<HistoryMessageReply>();
 	const auto &summary = item->summaryEntry();
 	const auto showSummaryReply = !summary.result.empty() && summary.shown;

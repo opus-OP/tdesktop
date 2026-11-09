@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "dialogs/dialogs_inner_widget.h"
 
+#include "blacklist/blacklist_manager.h"
 #include "dialogs/dialogs_three_state_icon.h"
 #include "dialogs/ui/chat_search_empty.h"
 #include "dialogs/ui/chat_search_in.h"
@@ -350,6 +351,12 @@ InnerWidget::InnerWidget(
 			// Folder rows change their unread badge with this setting.
 			update();
 		}
+	}, lifetime());
+
+	Blacklist::Manager::Instance().changes(
+	) | rpl::on_next([=] {
+		_cachedRows.clear();
+		update();
 	}, lifetime());
 
 	session().data().contactsLoaded().changes(
@@ -3187,7 +3194,9 @@ void InnerWidget::setPressed(
 			const auto history = pressedTopicJump
 				? pressed->history()
 				: nullptr;
-			const auto item = history ? history->chatListMessage() : nullptr;
+			const auto item = history
+				? history->displayChatListMessage()
+				: nullptr;
 			_pressedTopicJumpRootId = item ? item->topicRootId() : MsgId();
 			_pressedSublistJumpPeerId = item
 				? item->sublistPeerId()
@@ -3236,7 +3245,9 @@ void InnerWidget::setFilteredPressed(
 			const auto history = pressedTopicJump
 				? _filterResults[pressed].row->history()
 				: nullptr;
-			const auto item = history ? history->chatListMessage() : nullptr;
+			const auto item = history
+				? history->displayChatListMessage()
+				: nullptr;
 			_pressedTopicJumpRootId = item ? item->topicRootId() : MsgId();
 			_pressedSublistJumpPeerId = item
 				? item->sublistPeerId()
@@ -3682,7 +3693,9 @@ bool InnerWidget::animatedPreviewCached(not_null<Row*> row) {
 		return false;
 	}
 	const auto thread = row->thread();
-	const auto item = thread ? row->entry()->chatListMessage() : nullptr;
+	const auto item = thread
+		? row->entry()->displayChatListMessage()
+		: nullptr;
 	if (!item) {
 		return false;
 	}
@@ -4908,6 +4921,7 @@ void InnerWidget::searchReceived(
 		? _searchState.inChat
 		: Key(_openedForum->history());
 	if (inject
+		&& !Blacklist::IsHidden(inject)
 		&& (globalSearch
 			|| !_searchState.inChat
 			|| inject->history() == _searchState.inChat.history())) {
@@ -4924,6 +4938,9 @@ void InnerWidget::searchReceived(
 	}
 	auto &results = toPreview ? _previewResults : _searchResults;
 	for (const auto &item : messages) {
+		if (Blacklist::IsHidden(item)) {
+			continue;
+		}
 		const auto history = item->history();
 		if (toPreview || !uniquePeers || !hasHistoryInResults(history)) {
 			const auto index = int(results.size());

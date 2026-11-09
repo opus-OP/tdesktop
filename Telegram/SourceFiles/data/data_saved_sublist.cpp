@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_saved_sublist.h"
 
 #include "api/api_unread_things.h"
+#include "blacklist/blacklist_manager.h"
 #include "apiwrap.h"
 #include "core/application.h"
 #include "data/data_changes.h"
@@ -20,6 +21,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_session.h"
 #include "data/data_unread_value.h"
 #include "data/data_user.h"
+#include "history/view/history_view_element.h"
 #include "history/view/history_view_item_preview.h"
 #include "history/history.h"
 #include "history/history_item.h"
@@ -918,6 +920,25 @@ Dialogs::BadgesState SavedSublist::chatListBadgesState() const {
 
 HistoryItem *SavedSublist::chatListMessage() const {
 	return _lastMessage.value_or(nullptr);
+}
+
+HistoryItem *SavedSublist::displayChatListMessage() const {
+	const auto item = chatListMessage();
+	if (!item || !Blacklist::IsHidden(item)) {
+		return item;
+	}
+	const auto history = parent()->owningHistory();
+	const auto peerId = sublistPeer()->id;
+	for (const auto &block : ranges::views::reverse(history->blocks)) {
+		for (const auto &view : ranges::views::reverse(block->messages)) {
+			const auto data = view->data();
+			if (data->sublistPeerId() == peerId
+				&& !Blacklist::IsHidden(data)) {
+				return data;
+			}
+		}
+	}
+	return nullptr;
 }
 
 bool SavedSublist::chatListMessageKnown() const {

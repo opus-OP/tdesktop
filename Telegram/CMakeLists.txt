@@ -1946,8 +1946,12 @@ PRIVATE
     settings/cloud_password/settings_cloud_password_validate_icon.h
     settings/sections/settings_active_sessions.cpp
     settings/sections/settings_active_sessions.h
+    blacklist/blacklist_manager.cpp
+    blacklist/blacklist_manager.h
     settings/sections/settings_advanced.cpp
     settings/sections/settings_advanced.h
+    settings/sections/settings_blacklist.cpp
+    settings/sections/settings_blacklist.h
     settings/sections/settings_chat.cpp
     settings/sections/settings_chat.h
     settings/sections/settings_blocked_peers.cpp

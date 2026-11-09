@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_forum_topic.h"
 
+#include "blacklist/blacklist_manager.h"
 #include "data/data_channel.h"
 #include "data/data_changes.h"
 #include "data/data_forum.h"
@@ -950,6 +951,25 @@ void ForumTopic::allowChatListMessageResolve() {
 
 HistoryItem *ForumTopic::chatListMessage() const {
 	return _lastMessage.value_or(nullptr);
+}
+
+HistoryItem *ForumTopic::displayChatListMessage() const {
+	const auto item = chatListMessage();
+	if (!item || !Blacklist::IsHidden(item)) {
+		return item;
+	}
+	const auto history = this->history();
+	for (const auto &block : ranges::views::reverse(history->blocks)) {
+		for (const auto &view : ranges::views::reverse(block->messages)) {
+			const auto data = view->data();
+			if ((data->topicRootId() == rootId()
+					|| data->id == rootId())
+				&& !Blacklist::IsHidden(data)) {
+				return data;
+			}
+		}
+	}
+	return nullptr;
 }
 
 bool ForumTopic::chatListMessageKnown() const {

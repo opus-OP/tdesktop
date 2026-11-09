@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/history_view_pinned_tracker.h"
 
+#include "blacklist/blacklist_manager.h"
 #include "data/data_changes.h"
 #include "data/data_peer.h"
 #include "data/data_chat.h"
@@ -56,6 +57,12 @@ PinnedTracker::PinnedTracker(not_null<Data::Thread*> thread)
 		} else {
 			clear();
 		}
+	}, _lifetime);
+
+	Blacklist::Manager::Instance().changes(
+	) | rpl::on_next([=] {
+		_viewerAroundId = 0;
+		refreshViewer();
 	}, _lifetime);
 }
 
@@ -113,7 +120,13 @@ void PinnedTracker::refreshViewer() {
 		const auto count = result.size();
 		_slice.ids.reserve(count);
 		for (auto i = 0; i != count; ++i) {
-			_slice.ids.push_back(result[i]);
+			const auto id = result[i];
+			if (const auto item = _thread->owner().message(id)) {
+				if (Blacklist::IsHidden(item)) {
+					continue;
+				}
+			}
+			_slice.ids.push_back(id);
 		}
 		refreshCurrentFromSlice();
 		if (_slice.fullCount == 0) {

@@ -145,6 +145,9 @@ public:
 	[[nodiscard]] virtual UnreadState chatListUnreadState() const = 0;
 	[[nodiscard]] virtual BadgesState chatListBadgesState() const = 0;
 	[[nodiscard]] virtual HistoryItem *chatListMessage() const = 0;
+	[[nodiscard]] virtual HistoryItem *displayChatListMessage() const {
+		return chatListMessage();
+	}
 	[[nodiscard]] virtual bool chatListMessageKnown() const = 0;
 	[[nodiscard]] virtual const QString &chatListName() const = 0;
 	[[nodiscard]] virtual const QString &chatListNameSortKey() const = 0;

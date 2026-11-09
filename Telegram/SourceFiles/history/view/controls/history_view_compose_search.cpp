@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/controls/history_view_compose_search.h"
 
 #include "api/api_messages_search_merged.h"
+#include "blacklist/blacklist_manager.h"
 #include "boxes/peer_list_box.h"
 #include "core/click_handler_types.h"
 #include "core/ui_integration.h"
@@ -226,6 +227,9 @@ void ListController::addItems(const MessageIdsList &ids, bool clear) {
 	const auto key = Dialogs::Key{ _history };
 	for (const auto &id : ids) {
 		if (const auto item = owner.message(id)) {
+			if (Blacklist::IsHidden(item)) {
+				continue;
+			}
 			const auto shared = std::make_shared<Row*>(nullptr);
 			auto row = std::make_unique<Row>(
 				std::make_unique<Dialogs::FakeRow>(

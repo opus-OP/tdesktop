@@ -18,6 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_stickers_creator.h"
 #include "api/api_suggest_post.h"
 #include "api/api_toggling_media.h" // Api::ToggleFavedSticker
+#include "blacklist/blacklist_manager.h"
 #include "base/qt/qt_key_modifiers.h"
 #include "base/unixtime.h"
 #include "history/view/history_view_list_widget.h"
@@ -1393,6 +1394,40 @@ void AddTopMessageActions(
 	AddViewStatisticsAction(menu, request, list);
 }
 
+void AddBlacklistAction(
+		not_null<Ui::PopupMenu*> menu,
+		const ContextMenuRequest &request,
+		not_null<ListWidget*> list) {
+	const auto item = request.item;
+	if (!item || !request.selectedItems.empty()) {
+		return;
+	}
+	const auto user = item->from()->asUser();
+	if (!user || user->isSelf()) {
+		return;
+	}
+	const auto id = peerToUser(user->id);
+	const auto hidden = Blacklist::IsHidden(id);
+	const auto username = user->username();
+	const auto name = user->name();
+	menu->addAction(
+		hidden
+			? Blacklist::Tr(
+				"Show user's messages",
+				"Показать сообщения пользователя")
+			: Blacklist::Tr(
+				"Hide user's messages",
+				"Скрыть сообщения пользователя"),
+		crl::guard(list.get(), [=] {
+			if (hidden) {
+				Blacklist::Manager::Instance().remove(id);
+			} else {
+				Blacklist::Manager::Instance().add(id, username, name);
+			}
+		}),
+		hidden ? &st::menuIconShowInFolder : &st::menuIconBlock);
+}
+
 void AddMessageActions(
 		not_null<Ui::PopupMenu*> menu,
 		const ContextMenuRequest &request,
@@ -1406,6 +1441,7 @@ void AddMessageActions(
 	AddSaveRichHtmlAction(menu, request, list);
 	AddReportAction(menu, request, list);
 	AddBlockSenderAction(menu, request, list);
+	AddBlacklistAction(menu, request, list);
 	if (request.item && request.selectedItems.empty()) {
 		AddEphemeralMessageActions(
 			menu,

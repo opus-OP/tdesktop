@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/history.h"
 
+#include "blacklist/blacklist_manager.h"
 #include "history/view/history_view_element.h"
 #include "history/view/history_view_item_preview.h"
 #include "history/view/history_view_translate_tracker.h"
@@ -2951,6 +2952,22 @@ void History::resolveChatListMessageGroup() {
 
 HistoryItem *History::chatListMessage() const {
 	return _chatListMessage.value_or(nullptr);
+}
+
+HistoryItem *History::displayChatListMessage() const {
+	const auto item = chatListMessage();
+	if (!item || !Blacklist::IsHidden(item)) {
+		return item;
+	}
+	for (const auto &block : ranges::views::reverse(blocks)) {
+		for (const auto &view : ranges::views::reverse(block->messages)) {
+			const auto data = view->data();
+			if (!Blacklist::IsHidden(data)) {
+				return data;
+			}
+		}
+	}
+	return nullptr;
 }
 
 bool History::chatListMessageKnown() const {

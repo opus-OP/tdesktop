@@ -13,6 +13,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/qt/qt_common_adapters.h"
 #include "history/history.h"
 #include "history/history_item.h"
+#include "blacklist/blacklist_manager.h"
 #include "history/history_item_components.h"
 #include "history/history_item_helpers.h"
 #include "history/history_item_text.h"
@@ -635,6 +636,14 @@ ListWidget::ListWidget(
 		}, lifetime());
 	}
 
+	Blacklist::Manager::Instance().changes(
+	) | rpl::on_next([=] {
+		crl::on_main(this, [=] {
+			_forceBlacklistRefresh = true;
+			refreshViewer();
+		});
+	}, lifetime());
+
 	_scrollDateHideTimer.setCallback([this] { scrollDateHideByTimer(); });
 
 	if (const auto window = controllerOrNull()) {
@@ -957,10 +966,18 @@ void ListWidget::refreshRows(const Data::MessagesSlice &old) {
 	_items.reserve(_slice.ids.size());
 	std::swap(_views, _viewsCapacity);
 	auto nearestIndex = -1;
+	auto nearestPending = false;
 	const auto pushItem = [&](const FullMsgId &fullId) {
 		if (const auto item = session().data().message(fullId)) {
 			if (_slice.nearestToAround == fullId) {
+				nearestPending = true;
+			}
+			if (Blacklist::IsHidden(item)) {
+				return;
+			}
+			if (nearestPending) {
 				nearestIndex = int(_items.size());
+				nearestPending = false;
 			}
 			const auto view = enforceViewForItem(item, _viewsCapacity);
 			_items.push_back(view);
@@ -980,6 +997,24 @@ void ListWidget::refreshRows(const Data::MessagesSlice &old) {
 		for (const auto &fullId : _slice.ids) {
 			pushItem(fullId);
 		}
+	}
+	if (nearestIndex < 0 && nearestPending && !_items.empty()) {
+		nearestIndex = int(_items.size()) - 1;
+	}
+	if (_forceBlacklistRefresh) {
+		for (const auto &view : _items) {
+			view->initDimensions();
+		}
+		_forceBlacklistRefresh = false;
+	}
+	if (_items.empty()
+		&& !_slice.ids.empty()
+		&& (_slice.skippedBefore != 0 || _slice.skippedAfter != 0)) {
+		// The loaded window consisted only of hidden messages. Ask for a
+		// wider window instead of showing an empty viewport until the user
+		// scrolls into the nearest visible message.
+		_idsLimit = std::max(_idsLimit * 2, _idsLimit + 32);
+		crl::on_main(this, [=] { refreshViewer(); });
 	}
 	if (_translateTracker) {
 		_translateTracker->addBunchFrom(_items);
@@ -2818,6 +2853,18 @@ bool ListWidget::elementAnimationsPaused() {
 }
 
 bool ListWidget::elementHideReply(not_null<const Element*> view) {
+	if (const auto reply = view->data()->Get<HistoryMessageReply>()) {
+		const auto peerId = reply->externalPeerId()
+			? reply->externalPeerId()
+			: view->data()->history()->peer->id;
+		if (const auto target = session().data().message(
+				peerId,
+				reply->messageId())) {
+			if (Blacklist::IsHidden(target)) {
+				return true;
+			}
+		}
+	}
 	return _delegate->listElementHideReply(view);
 }
 

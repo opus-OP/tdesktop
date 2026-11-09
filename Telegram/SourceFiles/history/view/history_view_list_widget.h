@@ -1168,6 +1168,7 @@ private:
 	std::unique_ptr<Ui::ThanosEffectController> _thanosController;
 
 	crl::time _firstContentDeadline = 0;
+	bool _forceBlacklistRefresh = false;
 	rpl::lifetime _viewerLifetime;
 
 };

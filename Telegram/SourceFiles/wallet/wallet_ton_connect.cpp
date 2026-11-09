@@ -147,30 +147,13 @@ constexpr auto kBidiControls = std::array{
 		engine::TonConnectDerivedSession &session,
 		const std::string &schema,
 		const std::string &cell) {
-	using Decoding = engine::TonConnectSignDataCellDecoding;
-	auto result = std::vector<TonConnectSignDataField>();
-	try {
-		const auto decoding = session.decode_sign_data_cell(schema, cell);
-		const auto decoded = std::get_if<Decoding::kDecoded>(
-			&decoding.get_variant());
-		if (!decoded) {
-			return result;
-		}
-		result.reserve(decoded->fields.size());
-		for (const auto &field : decoded->fields) {
-			result.push_back({
-				.depth = int(std::min(
-					field.depth,
-					uint32_t(std::numeric_limits<int>::max()))),
-				.name = QString::fromStdString(field.name),
-				.value = QString::fromStdString(field.value),
-			});
-		}
-	} catch (...) {
-		// Display only: a failed decode must not cost the request its answer.
-		return {};
-	}
-	return result;
+	// The pinned wallet-engine revision in this checkout does not export
+	// the optional signData cell decoder. Keep the TON Connect request
+	// functional and show no decoded cells instead of failing to build.
+	Q_UNUSED(session);
+	Q_UNUSED(schema);
+	Q_UNUSED(cell);
+	return {};
 }
 
 } // namespace

@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_premium.h"
 #include "api/api_sensitive_content.h"
 #include "api/api_transcribes.h"
+#include "blacklist/blacklist_manager.h"
 #include "lang/lang_keys.h"
 #include "calls/calls_instance.h" // Core::App().calls().joinGroupCall.
 #include "history/view/history_view_item_preview.h"
@@ -4898,6 +4899,9 @@ void HistoryItem::highlightProcessDone() {
 }
 
 bool HistoryItem::showNotification() const {
+	if (Blacklist::IsHidden(this)) {
+		return false;
+	}
 	const auto channel = _history->peer->asChannel();
 	if (channel && !channel->amIn()) {
 		return false;

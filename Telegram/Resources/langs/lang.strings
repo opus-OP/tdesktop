@@ -825,6 +825,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_call_device_default" = "Default";
 
 "lng_settings_section_devices" = "Speakers and Camera";
+"lng_settings_blacklist" = "Blacklist";
 "lng_settings_devices_calls" = "Calls and video chats";
 "lng_settings_devices_calls_same" = "Use the same devices for calls";
 "lng_settings_devices_inactive" = "Unavailable";
