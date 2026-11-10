@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/history_view_reply.h"
 
+#include "blacklist/blacklist_manager.h"
 #include "core/click_handler_types.h"
 #include "core/ui_integration.h"
 #include "data/stickers/data_custom_emoji.h"
@@ -357,6 +358,18 @@ void Reply::update(
 	const auto &fields = data->fields();
 	const auto &quote = fields.displayQuote();
 	const auto message = data->resolvedMessage.get();
+	const auto hidden = [&] {
+		if (Blacklist::IsHidden(message)) {
+			return true;
+		}
+		if (fields.externalPeerId) {
+			if (const auto external = view->history()->owner().message(
+					FullMsgId(fields.externalPeerId, fields.messageId))) {
+				return Blacklist::IsHidden(external);
+			}
+		}
+		return false;
+	}();
 	const auto messageMedia = (message
 			&& (fields.todoItemId || !fields.pollOption.isEmpty()))
 		? message->media()
@@ -405,16 +418,18 @@ void Reply::update(
 		: (messagePoll && fields.pollOption.isEmpty())
 		? &messagePoll->attachedMedia
 		: nullptr;
-	const auto hasPreview = (story && story->hasReplyPreview())
-		|| (message
-			&& message->media()
-			&& message->media()->hasReplyPreview())
-		|| (externalMedia && externalMedia->hasReplyPreview())
-		|| (pollMediaPtr
-			&& (pollMediaPtr->photo || pollMediaPtr->document));
+	const auto hasPreview = !hidden
+		&& ((story && story->hasReplyPreview())
+			|| (message
+				&& message->media()
+				&& message->media()->hasReplyPreview())
+			|| (externalMedia && externalMedia->hasReplyPreview())
+			|| (pollMediaPtr
+				&& (pollMediaPtr->photo || pollMediaPtr->document)));
 	_hasPreview = hasPreview ? 1 : 0;
-	_displaying = data->displaying() ? 1 : 0;
-	_multiline = data->multiline() ? 1 : 0;
+	_hidden = hidden ? 1 : 0;
+	_displaying = (data->displaying() && !hidden) ? 1 : 0;
+	_multiline = (!hidden && data->multiline()) ? 1 : 0;
 	const auto hasQuoteIcon = _displaying
 		&& fields.manualQuote
 		&& !quote.empty();
@@ -425,7 +440,9 @@ void Reply::update(
 		.session = &view->history()->session(),
 		.repaint = repaint,
 	}));
-	const auto text = (!_displaying && data->unavailable())
+	const auto text = hidden
+		? TextWithEntities()
+		: (!_displaying && data->unavailable())
 		? TextWithEntities()
 		: task
 		? Ui::Text::Colorized(task->completionDate
@@ -474,6 +491,20 @@ void Reply::update(
 	}
 
 	updateName(view, data);
+
+	if (hidden) {
+		_link = nullptr;
+		_stateText = Blacklist::Tr(
+			"Hidden message",
+			"Скрытое сообщение");
+		_maxWidth = st::historyReplyPadding.left()
+			+ st::msgDateFont->width(_stateText)
+			+ st::historyReplyPadding.right();
+		_minHeight = st::historyReplyPadding.top()
+			+ st::msgServiceNameFont->height
+			+ st::normalFont->height
+			+ st::historyReplyPadding.bottom();
+	}
 
 	if (_displaying) {
 		setLinkFrom(view, data);
@@ -613,6 +644,9 @@ QString Reply::senderName(
 bool Reply::isNameUpdated(
 		not_null<const Element*> view,
 		not_null<HistoryMessageReply*> data) const {
+	if (_hidden) {
+		return false;
+	}
 	if (hasBackgroundEmoji() != _hasBackgroundEmoji) {
 		return true;
 	}
@@ -629,6 +663,9 @@ void Reply::updateName(
 		not_null<const Element*> view,
 		not_null<HistoryMessageReply*> data,
 		std::optional<PeerData*> resolvedSender) const {
+	if (_hidden) {
+		return;
+	}
 	auto viaBotUsername = QString();
 	const auto message = data->resolvedMessage.get();
 	const auto forwarded = message

@@ -173,6 +173,7 @@ private:
 	mutable uint8 _hasPreview : 1 = 0;
 	mutable uint8 _displaying : 1 = 0;
 	mutable uint8 _multiline : 1 = 0;
+	mutable uint8 _hidden : 1 = 0;
 
 };
 

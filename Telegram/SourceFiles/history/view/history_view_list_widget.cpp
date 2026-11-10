@@ -2853,18 +2853,6 @@ bool ListWidget::elementAnimationsPaused() {
 }
 
 bool ListWidget::elementHideReply(not_null<const Element*> view) {
-	if (const auto reply = view->data()->Get<HistoryMessageReply>()) {
-		const auto peerId = reply->externalPeerId()
-			? reply->externalPeerId()
-			: view->data()->history()->peer->id;
-		if (const auto target = session().data().message(
-				peerId,
-				reply->messageId())) {
-			if (Blacklist::IsHidden(target)) {
-				return true;
-			}
-		}
-	}
 	return _delegate->listElementHideReply(view);
 }
 
